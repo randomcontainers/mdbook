@@ -15,7 +15,8 @@ homepage: https://rust-lang.github.io/mdBook/
 # (OFL-1.1), highlight.js and Ace (BSD-3-Clause), clipboard.js,
 # elasticlunr.js, mark.js, three highlighting color schemes and the copy
 # button's icon from Octicons (MIT), and a favicon based on an image by Dave
-# Gandy (CC-BY-4.0). The release of each version carries mdBook's source.
+# Gandy (CC-BY-4.0); see licenses/front-end/FILES. The release of each
+# version carries mdBook's source.
 license: MPL-2.0 AND MIT AND Apache-2.0 AND BSD-3-Clause AND ISC AND CC0-1.0 AND Unicode-3.0 AND CC-BY-4.0 AND OFL-1.1 AND Apache-2.0 WITH LLVM-exception
 source-release: true
 upstream:
