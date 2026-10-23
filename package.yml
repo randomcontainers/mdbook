@@ -1,0 +1,177 @@
+name: mdbook
+title: mdBook
+summary: Builds a book or documentation site from Markdown files, with search, syntax highlighting and a preview server that rebuilds on changes.
+homepage: https://rust-lang.github.io/mdBook/
+# mdBook is MPL-2.0. The crates compiled into it are MIT, or offer a choice
+# that includes MIT, except: num-modular, num-order, sync_wrapper and ryu
+# (Apache-2.0), ego-tree, inotify and inotify-sys (ISC), notify (CC0-1.0),
+# matchit (MIT AND BSD-3-Clause), unicode-ident (Unicode data under
+# Unicode-3.0) and font-awesome-as-a-crate (MIT, and CC-BY-4.0 for the Font
+# Awesome Free icons it embeds). The build stops when a crate linked into
+# mdbook has a license that this label does not cover. The Rust standard
+# library is linked in too, with compiler-builtins under Apache-2.0 WITH
+# LLVM-exception. mdbook also embeds its HTML theme, which includes Open Sans
+# (Apache-2.0), Source Code Pro (OFL-1.1), highlight.js and Ace
+# (BSD-3-Clause), clipboard.js, elasticlunr.js, mark.js, three highlighting
+# color schemes and the copy button's icon from Octicons (MIT), and a favicon
+# based on an image by Dave Gandy (CC-BY-4.0). The release of each version
+# carries mdBook's source.
+license: MPL-2.0 AND MIT AND Apache-2.0 AND BSD-3-Clause AND ISC AND CC0-1.0 AND Unicode-3.0 AND CC-BY-4.0 AND OFL-1.1 AND Apache-2.0 WITH LLVM-exception
+source-release: true
+upstream:
+  source: github-release
+  repository: rust-lang/mdBook
+  # Pre-releases such as v0.5.0-beta.2 do not match.
+  tag-pattern: '^v(\d+\.\d+\.\d+)$'
+  version-template: '{1}'
+  versioning: semver
+  version: 0.5.4
+  # The release assets are prebuilt binaries, so the build compiles the tag.
+  # The tag is built with its Cargo.lock, and cargo checks every crate it
+  # downloads against the checksum there.
+  git:
+    url: https://github.com/rust-lang/mdBook.git
+    tag: v{version}
+    commit: 2ea30c00f00647d2b3f4c0f79b3e0e1eabc0b66d
+  extra-artifacts:
+    # The Rust release manifest, signed with the Rust release key. The build
+    # installs rustc, cargo, rust-std and rust-src from the archives it lists,
+    # each checked against the SHA-256 the manifest gives. The reconciler moves
+    # version and sha256 to each new stable release once it is 7 days old.
+    rust-toolchain:
+      version: 1.99.1
+      url: https://static.rust-lang.org/dist/channel-rust-{version}.toml
+      checksums: {url: 'https://static.rust-lang.org/dist/channel-rust-{version}.toml.sha256', algorithm: sha256}
+      signature: https://static.rust-lang.org/dist/channel-rust-{version}.toml.asc
+      sha256: fb152be80975c194aa5fc684b2aec3a6e14e2b855efe2faa4e5f8ae6e590f463
+      track:
+        source: html-index
+        url: https://static.rust-lang.org/dist/channel-rust-stable.toml
+        pattern: '^url = "https://static\.rust-lang\.org/dist/(?P<date>\d{4}-\d{2}-\d{2})/rustc-(?P<version>\d+\.\d+\.\d+)-x86_64-unknown-linux-gnu\.tar\.gz"$'
+        versioning: semver
+        cooldown: 7d
+        skip: []
+    # Built from its crate and used only in the build stage. It stores the
+    # list of crates in the mdbook binary, where SBOM tools and image scanners
+    # read it. Update version and sha256 together, with the checksum from the
+    # crates.io index.
+    cargo-auditable:
+      version: 0.7.7
+      url: https://static.crates.io/crates/cargo-auditable/cargo-auditable-{version}.crate
+      sha256: ccdd489bc94d1338cd04389a842e00661300331ec915fb376b4810ef7d480b5d
+image:
+  entrypoint: [mdbook]
+  cmd: [build]
+test:
+  - |
+    mdbook --version > version.txt
+    test "$(cat version.txt)" = "mdbook v$VERSION" \
+      || { echo "expected 'mdbook v$VERSION', got '$(cat version.txt)'" >&2; exit 1; }
+  - |
+    # mdbook is linked against the C library of the image it was built in,
+    # and its .dep-v0 section lists the crates it was built from. The byte
+    # before the loader's path is the last byte of the build ID, which tr
+    # may keep, so the path is matched anywhere in a word.
+    head -c 4096 /usr/local/bin/mdbook | LC_ALL=C tr -c 'A-Za-z0-9_./-' '\n' | grep -oE '/lib(64)?/ld-[A-Za-z0-9_.-]+' > loader.txt \
+      || { echo "mdbook names no dynamic loader" >&2; exit 1; }
+    loader=$(head -n 1 loader.txt)
+    test -e "$loader" || { echo "mdbook needs $loader, which is not in the image" >&2; exit 1; }
+    LC_ALL=C grep -Fq .dep-v0 /usr/local/bin/mdbook || { echo "mdbook has no .dep-v0 section" >&2; exit 1; }
+  - |
+    # A book with an include, a Rust code block and a chapter that
+    # SUMMARY.md names but that does not exist yet, which mdbook creates.
+    mkdir -p book1/src
+    cd book1 || exit 1
+    printf '%s\n' '[book]' 'title = "Test book"' 'authors = ["Tester"]' > book.toml
+    printf '%s\n' '# Summary' '' '[Introduction](intro.md)' '' '- [First chapter](chapter_1.md)' \
+      '  - [Nested chapter](nested/chapter_2.md)' > src/SUMMARY.md
+    printf '%s\n' '# Introduction' '' 'Included: {{#include ../snippet.txt}}' > src/intro.md
+    printf '%s\n' 'snippet-4711' > snippet.txt
+    printf '%s\n' '# First chapter' '' '```rust' 'fn main() {' '    println!("hello");' '}' '```' > src/chapter_1.md
+    mdbook build > ../build.log 2>&1 || { cat ../build.log >&2; exit 1; }
+    # need FILE: FILE exists and is not empty.
+    need() {
+      test -s "$1" || { echo "mdbook build did not write $1; book/ has:" >&2; find book >&2; exit 1; }
+    }
+    # has FILE TEXT: FILE contains TEXT.
+    has() {
+      grep -Fq "$2" "$1" || { echo "$1 does not contain $2:" >&2; cat "$1" >&2; exit 1; }
+    }
+    has src/nested/chapter_2.md '# Nested chapter'
+    need book/index.html
+    need book/print.html
+    need book/nested/chapter_2.html
+    has book/intro.html 'Included: snippet-4711'
+    has book/chapter_1.html 'language-rust'
+    # The theme's icons are inline SVG from the Font Awesome crate.
+    has book/index.html '<span class=fa-svg'
+    # Search, highlighting and fonts are written with hashed file names.
+    set -- book/searchindex-*.js
+    need "$1"
+    set -- book/highlight-*.js
+    need "$1"
+    set -- book/fonts/source-code-pro-v11-all-charsets-500-*.woff2
+    need "$1"
+    need book/fonts/OPEN-SANS-LICENSE.txt
+    need book/fonts/SOURCE-CODE-PRO-LICENSE.txt
+  - |
+    # mdbook runs a renderer in its output directory and writes the render
+    # context to its stdin as JSON. A command that names a path, such as
+    # ./capture.sh, is taken relative to the book's root. With a second
+    # output, each one writes to its own directory.
+    cd book1 || exit 1
+    printf '%s\n' '#!/bin/sh' 'cat > context.json' > capture.sh
+    chmod +x capture.sh
+    printf '%s\n' '' '[output.html]' '' '[output.capture]' 'command = "./capture.sh"' >> book.toml
+    mdbook build > ../renderer.log 2>&1 || { cat ../renderer.log >&2; exit 1; }
+    test -s book/html/index.html || { echo "no book/html/index.html" >&2; find book >&2; exit 1; }
+    test -s book/capture/context.json || { echo "the capture renderer wrote nothing" >&2; cat ../renderer.log >&2; exit 1; }
+    for want in "\"version\":\"$VERSION\"" '"title":"Test book"' 'Included: snippet-4711'; do
+      grep -Fq "$want" book/capture/context.json \
+        || { echo "the render context lacks $want:" >&2; cat book/capture/context.json >&2; exit 1; }
+    done
+    mdbook clean
+    if [ -e book ]; then echo "mdbook clean left book/ behind" >&2; exit 1; fi
+  - |
+    # mdbook init without questions, then serve on 127.0.0.1:3456 (0D80 in
+    # /proc/net/tcp), which rebuilds the book when a chapter changes.
+    mdbook init --title 'Served book' --ignore none served > init.log 2>&1 || { cat init.log >&2; exit 1; }
+    test -s served/src/chapter_1.md || { echo "mdbook init wrote no chapter" >&2; cat init.log >&2; exit 1; }
+    cd served || exit 1
+    mdbook serve -n 127.0.0.1 -p 3456 > ../serve.log 2>&1 &
+    pid=$!
+    trap 'kill "$pid" 2>/dev/null || true' EXIT
+    # wait_for WHAT COMMAND...: run COMMAND once a second for up to 60 seconds.
+    wait_for() {
+      what=$1
+      shift
+      i=0
+      until "$@"; do
+        i=$((i + 1))
+        if [ "$i" -gt 60 ]; then echo "timed out waiting for $what; mdbook serve wrote:" >&2; cat ../serve.log >&2; exit 1; fi
+        sleep 1
+      done
+    }
+    listening() {
+      grep -Fq 'Watching for changes' ../serve.log \
+        && awk '$2 == "0100007F:0D80" && $4 == "0A" { found = 1 } END { exit !found }' /proc/net/tcp
+    }
+    wait_for 'the server' listening
+    grep -Fq 'Serving on: http://127.0.0.1:3456' ../serve.log \
+      || { echo "unexpected log:" >&2; cat ../serve.log >&2; exit 1; }
+    grep -Fq '__livereload' book/index.html || { echo "book/index.html has no live reload script" >&2; exit 1; }
+    sleep 2
+    printf '\n%s\n' 'Changed while serving.' >> src/chapter_1.md
+    wait_for 'the rebuild' grep -Fq 'Changed while serving.' book/chapter_1.html
+    kill "$pid"
+    wait "$pid" || true
+  - |
+    mdbook completions bash > completions.bash
+    grep -Fq _mdbook completions.bash || { echo "no _mdbook function in the bash completions:" >&2; head completions.bash >&2; exit 1; }
+examples:
+  - title: Build the book in the current directory into book/
+    command: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/randomcontainers/mdbook
+  - title: Start a new book in the current directory
+    command: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/randomcontainers/mdbook init --title "My book" --ignore git
+  - title: Preview the book at http://localhost:3000, rebuilt on every change
+    command: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -p 127.0.0.1:3000:3000 ghcr.io/randomcontainers/mdbook serve -n 0.0.0.0
