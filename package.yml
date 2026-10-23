@@ -8,14 +8,14 @@ homepage: https://rust-lang.github.io/mdBook/
 # matchit (MIT AND BSD-3-Clause), unicode-ident (Unicode data under
 # Unicode-3.0) and font-awesome-as-a-crate (MIT, and CC-BY-4.0 for the Font
 # Awesome Free icons it embeds). The build stops when a crate linked into
-# mdbook has a license that this label does not cover. The Rust standard
-# library is linked in too, with compiler-builtins under Apache-2.0 WITH
-# LLVM-exception. mdbook also embeds its HTML theme, which includes Open Sans
-# (Apache-2.0), Source Code Pro (OFL-1.1), highlight.js and Ace
-# (BSD-3-Clause), clipboard.js, elasticlunr.js, mark.js, three highlighting
-# color schemes and the copy button's icon from Octicons (MIT), and a favicon
-# based on an image by Dave Gandy (CC-BY-4.0). The release of each version
-# carries mdBook's source.
+# mdbook has a license that this label does not cover (scripts/cargo-licenses.py
+# reads the line). The Rust standard library is linked in too, with
+# compiler-builtins under Apache-2.0 WITH LLVM-exception. mdbook also embeds
+# its HTML theme, which includes Open Sans (Apache-2.0), Source Code Pro
+# (OFL-1.1), highlight.js and Ace (BSD-3-Clause), clipboard.js,
+# elasticlunr.js, mark.js, three highlighting color schemes and the copy
+# button's icon from Octicons (MIT), and a favicon based on an image by Dave
+# Gandy (CC-BY-4.0). The release of each version carries mdBook's source.
 license: MPL-2.0 AND MIT AND Apache-2.0 AND BSD-3-Clause AND ISC AND CC0-1.0 AND Unicode-3.0 AND CC-BY-4.0 AND OFL-1.1 AND Apache-2.0 WITH LLVM-exception
 source-release: true
 upstream:
@@ -34,10 +34,11 @@ upstream:
     tag: v{version}
     commit: 2ea30c00f00647d2b3f4c0f79b3e0e1eabc0b66d
   extra-artifacts:
-    # The Rust release manifest, signed with the Rust release key. The build
-    # installs rustc, cargo, rust-std and rust-src from the archives it lists,
-    # each checked against the SHA-256 the manifest gives. The reconciler moves
-    # version and sha256 to each new stable release once it is 7 days old.
+    # The Rust release manifest, signed with the Rust release key in
+    # keys/rust.gpg. scripts/rust-toolchain.sh installs rustc, cargo,
+    # rust-std and rust-src from the archives it lists, each checked against
+    # the SHA-256 the manifest gives. The reconciler moves version and sha256
+    # to each new stable release once it is 7 days old.
     rust-toolchain:
       version: 1.99.1
       url: https://static.rust-lang.org/dist/channel-rust-{version}.toml
